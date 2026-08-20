@@ -37,7 +37,7 @@
     const done=!!student.completed, badge=$('statusBadge');
     badge.textContent=done?'Đã hoàn thành':'Chưa hoàn thành'; badge.className=`status ${done?'done':'pending'}`;
     const root=$('fields'); root.innerHTML='';
-    const fields=student.formFields||student.missingFields||[];
+    const fields=[...new Set([...(student.formFields||student.missingFields||[]),'phone'])];
     fields.forEach(key=>{
       const meta=labels[key]; if(!meta) return;
       const wrap=document.createElement('div'); wrap.className='field';
@@ -75,7 +75,7 @@
     $('formMessage').className='form-message'; $('formMessage').textContent='Đang lưu…';
     const fd=new FormData(e.currentTarget), data={};
     // Chỉ các ô đang hiển thị mới được phép cập nhật.
-    (currentStudent.formFields||currentStudent.missingFields||[]).forEach(k=>{ if(fd.has(k)) data[k]=String(fd.get(k)||'').trim(); });
+    [...new Set([...(currentStudent.formFields||currentStudent.missingFields||[]),'phone'])].forEach(k=>{ if(fd.has(k)) data[k]=String(fd.get(k)||'').trim(); });
     // Gửi đầy đủ trạng thái môn để có thể bỏ chọn môn đã chọn trước đó.
     SUBJECT_KEYS.forEach(k=>data[k]=fd.get(k)==='x'?'x':'');
     try{

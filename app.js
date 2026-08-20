@@ -34,7 +34,7 @@
     $("studentClass").textContent=`Lớp ${student.className || ""} · Khối ${student.grade || ""}`;
     const done=!!student.completed; const b=$("statusBadge"); b.textContent=done?"Đã hoàn thành":"Chưa hoàn thành"; b.className=`status ${done?"done":"pending"}`;
     const root=$("fields"); root.innerHTML="";
-    const missing=student.missingFields || [];
+    const missing=student.formFields || student.missingFields || [];
     missing.forEach(key=>{
       const meta=labels[key]; if(!meta) return;
       const wrap=document.createElement("div"); wrap.className="field";

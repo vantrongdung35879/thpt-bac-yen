@@ -1,42 +1,15 @@
-<!DOCTYPE html>
-<html lang="vi" data-theme="light">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - THPT B&#7855;c Y&ecirc;n</title>
-    <meta name="description" content="Dashboard qu&#7843;n tr&#7883; - THPT B&#7855;c Y&ecirc;n">
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/admin.css">
-    <link rel="stylesheet" href="css/responsive.css">
-</head>
-<body>
-    <div id="app">
-        <div class="initial-loader">
-            <div class="loading-spinner">
-                <div class="spinner-ring"></div>
-            </div>
-            <p class="loading-text">&#0110;ang t&#7843;i...</p>
-        </div>
-    </div>
-
-    <script src="js/config.js"></script>
-    <script src="js/utils/helpers.js"></script>
-    <script src="js/utils/storage.js"></script>
-    <script src="js/utils/validators.js"></script>
-    <script src="js/api/api.js"></script>
-    <script src="js/api/mockApi.js"></script>
-    <script src="js/services/authService.js"></script>
-    <script src="js/services/studentService.js"></script>
-    <script src="js/services/formService.js"></script>
-    <script src="js/services/validationService.js"></script>
-    <script src="js/services/exportService.js"></script>
-    <script src="js/components/Toast.js"></script>
-    <script src="js/components/Modal.js"></script>
-    <script src="js/components/Loading.js"></script>
-    <script src="js/components/Progress.js"></script>
-    <script src="js/components/StudentForm.js"></script>
-    <script src="js/pages/studentPage.js"></script>
-    <script src="js/pages/adminPage.js"></script>
-    <script src="js/app.js"></script>
-</body>
-</html>
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>THPT Bắc Yên – Quản trị</title><link rel="stylesheet" href="admin.css"></head>
+<body><main class="wrap">
+<header class="top"><div><div class="eyebrow">THPT BẮC YÊN</div><h1>Quản trị biểu mẫu học sinh</h1></div><button id="logout" class="ghost hidden">Đăng xuất</button></header>
+<section id="login" class="panel auth"><h2>Đăng nhập quản trị</h2><p class="muted">Mật khẩu được kiểm tra ở máy chủ Google Apps Script.</p><form id="loginForm"><input id="password" type="password" placeholder="Mật khẩu quản trị" required><button>Đăng nhập</button></form><div id="loginMsg" class="msg"></div></section>
+<section id="admin" class="hidden">
+  <div class="stats"><div class="stat"><span>Tổng</span><strong id="total">0</strong></div><div class="stat"><span>Hoàn thành</span><strong id="done">0</strong></div><div class="stat"><span>Chưa xong</span><strong id="pending">0</strong></div><div class="stat"><span>Tiến độ</span><strong id="progress">0%</strong></div></div>
+  <section class="panel"><div class="toolbar"><div><h2>Danh sách học sinh</h2><p class="muted">Lọc, lấy link cá nhân, nhập dữ liệu từ Excel và xuất file.</p></div><div class="actions"><button id="refresh" class="ghost">Làm mới</button><label class="ghost filebtn">Nhập Excel <input id="importFile" type="file" accept=".xlsx,.xls" hidden></label><button id="export" class="primary">Xuất Excel</button></div></div>
+    <div class="filters"><input id="search" placeholder="Tìm theo họ tên…"><select id="classFilter"><option value="">Tất cả lớp</option></select><select id="statusFilter"><option value="">Tất cả trạng thái</option><option value="done">Đã hoàn thành</option><option value="pending">Chưa hoàn thành</option></select></div>
+    <div class="table-wrap"><table><thead><tr><th>Họ tên</th><th>Lớp</th><th>Email</th><th>SĐT</th><th>Môn</th><th>Trạng thái</th><th>Link</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </section>
+  <div id="msg" class="msg"></div>
+</section>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script><script src="config.js"></script><script src="admin.js"></script>
+</main></body></html>

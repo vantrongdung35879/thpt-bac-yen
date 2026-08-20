@@ -1,0 +1,196 @@
+/* =============================================
+   RESPONSIVE STYLES
+   Mobile-first approach
+   ============================================= */
+
+/* ---------- Mobile (< 480px) ---------- */
+@media (max-width: 479px) {
+    .page-header {
+        padding: 1rem;
+    }
+
+    .school-name { font-size: 1.1rem; }
+    .school-sub { font-size: 0.7rem; }
+
+    .student-main {
+        padding: 0.75rem;
+    }
+
+    .student-greeting {
+        padding: 1.25rem 1rem;
+    }
+
+    .student-name { font-size: 1.25rem; }
+
+    .student-meta {
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+
+    .progress-section {
+        padding: 1rem;
+    }
+
+    .form-section {
+        padding: 1rem;
+    }
+
+    .btn-save {
+        padding: 0.85rem;
+        font-size: 0.95rem;
+    }
+
+    /* Admin */
+    .admin-header {
+        padding: 0.75rem 1rem;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .header-right {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+
+    .stat-card {
+        padding: 1rem;
+    }
+
+    .stat-icon { font-size: 1.5rem; }
+    .stat-number { font-size: 1.4rem; }
+
+    .controls-bar {
+        flex-direction: column;
+    }
+
+    .search-box {
+        min-width: 100%;
+    }
+
+    .filter-group {
+        width: 100%;
+    }
+
+    .filter-select {
+        flex: 1;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 0.6rem 0.75rem;
+        font-size: 0.82rem;
+    }
+
+    .cell-name { max-width: 140px; }
+
+    /* Toast */
+    #toast-container {
+        top: auto;
+        bottom: 1rem;
+        right: 0.75rem;
+        left: 0.75rem;
+        max-width: 100%;
+    }
+
+    /* Modal */
+    .modal-container {
+        max-height: 90vh;
+        margin: 0.5rem;
+    }
+
+    .modal-header {
+        padding: 1rem;
+    }
+
+    .modal-body {
+        padding: 1rem;
+    }
+}
+
+/* ---------- Tablet (480px - 768px) ---------- */
+@media (min-width: 480px) and (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .controls-bar {
+        flex-wrap: wrap;
+    }
+
+    .search-box {
+        min-width: 250px;
+    }
+}
+
+/* ---------- Laptop (769px - 1024px) ---------- */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* ---------- Large Desktop (> 1024px) ---------- */
+@media (min-width: 1025px) {
+    .student-main {
+        padding: 2rem;
+    }
+
+    .admin-main {
+        padding: 2rem;
+    }
+}
+
+/* ---------- Touch-friendly buttons on mobile ---------- */
+@media (hover: none) and (pointer: coarse) {
+    .btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    .form-input {
+        min-height: 48px;
+        font-size: 16px; /* Prevents iOS zoom */
+    }
+
+    .filter-select {
+        min-height: 44px;
+    }
+
+    .table-row {
+        min-height: 56px;
+    }
+}
+
+/* ---------- Print styles ---------- */
+@media print {
+    .page-header,
+    .admin-header,
+    .controls-bar,
+    .theme-toggle,
+    .demo-badge,
+    #toast-container,
+    .modal-overlay { display: none !important; }
+
+    body {
+        background: white;
+        color: black;
+    }
+
+    .data-table {
+        font-size: 0.75rem;
+    }
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

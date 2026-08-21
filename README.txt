@@ -1,2 +1,1 @@
-GitHub Pages root. Copy the files in this folder to the repository root.
-Do NOT copy the original Excel file or any student data to the public repository.
+Bản V7 sửa lỗi SUBJECT_NAMES is not defined và chống cache trình duyệt. Hãy ghi đè các file trong github-pages-root lên GitHub Pages. Không cần nhập lại Excel hay xóa dữ liệu Google Sheets. Sau khi cập nhật, nhấn Ctrl+F5.

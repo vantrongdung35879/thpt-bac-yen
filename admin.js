@@ -3,8 +3,6 @@
   const $=id=>document.getElementById(id);
   let secret='', dataset=[], filtered=[];
   // Danh sách cột môn học phải dùng chung khi nhập/xuất Excel.
-  const SUBJECT_KEYS=['subject1','subject2','subject3','subject4','subject5','subject6','subject7'];
-  const SUBJECT_NAMES=['Toán','Tiếng Anh','Vật lí','Hóa học','Sinh học','Lịch sử','Địa lý'];
   function msg(text,cls=''){ $('msg').textContent=text; $('msg').className=`msg ${cls}`; }
   function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   async function post(payload){
@@ -117,7 +115,8 @@
           setCell_(row,cols.address,student.address);
           setCell_(row,cols.phone,student.phone);
           setCell_(row,cols.className,student.className);
-          SUBJECT_KEYS.forEach(k=>setCell_(row,cols[k],student[k]||''));
+          const subjectKeys=['subject1','subject2','subject3','subject4','subject5','subject6','subject7'];
+          subjectKeys.forEach(k=>setCell_(row,cols[k],student[k]||''));
           for(let c=0;c<row.length;c++) setWsCell_(ws,i,c,row[c]);
           updated++;
         }
@@ -192,7 +191,9 @@
       gender:find(['gioi tinh'],3), grade:find(['khoi lop'],4), address:find(['dia chi'],5),
       phone:find(['so dien thoai'],6), className:find(['ten lop'],7)
     };
-    SUBJECT_NAMES.forEach((name,idx)=>cols[SUBJECT_KEYS[idx]]=find([norm_(name)],8+idx));
+    const subjectKeys=['subject1','subject2','subject3','subject4','subject5','subject6','subject7'];
+    const subjectNames=['Toán','Tiếng Anh','Vật lí','Hóa học','Sinh học','Lịch sử','Địa lý'];
+    subjectNames.forEach((name,idx)=>cols[subjectKeys[idx]]=find([norm_(name)],8+idx));
     return cols;
   }
   function studentKey_(x){return `${norm_(x.fullName)}||${norm_(x.className)}`;}

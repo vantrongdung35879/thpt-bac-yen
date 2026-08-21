@@ -2,6 +2,9 @@
   const api=(window.APP_CONFIG||{}).API_URL||'';
   const $=id=>document.getElementById(id);
   let secret='', dataset=[], filtered=[];
+  // Danh sách cột môn học phải dùng chung khi nhập/xuất Excel.
+  const SUBJECT_KEYS=['subject1','subject2','subject3','subject4','subject5','subject6','subject7'];
+  const SUBJECT_NAMES=['Toán','Tiếng Anh','Vật lí','Hóa học','Sinh học','Lịch sử','Địa lý'];
   function msg(text,cls=''){ $('msg').textContent=text; $('msg').className=`msg ${cls}`; }
   function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   async function post(payload){

@@ -20,18 +20,66 @@
 
   async function download(blob,filename){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
   function bytesToBase64(bytes){let out='';for(let i=0;i<bytes.length;i+=0x8000)out+=String.fromCharCode(...bytes.subarray(i,Math.min(i+0x8000,bytes.length)));return btoa(out)}
-  function findHeaderRow(rows){for(let i=0;i<Math.min(rows.length,40);i++){const n=(rows[i]||[]).map(v=>norm(v));if(n.some(v=>v.includes('ho va ten')||v.includes('ho ten'))&&n.some(v=>v.includes('email')))return i}return -1}
-  function headerMap(h){const n=h.map(norm);const find=(arr,fb)=>{for(let i=0;i<n.length;i++)if(arr.some(x=>n[i].includes(x)))return i;return fb};const c={fullName:find(['ho va ten','ho ten'],0),email:find(['email'],1),birthDate:find(['ngay sinh'],2),gender:find(['gioi tinh'],3),grade:find(['khoi lop'],4),address:find(['dia chi'],5),phone:find(['so dien thoai'],6),className:find(['ten lop'],7)};SUBJECTS.forEach((s,i)=>c[`subject${i+1}`]=find([norm(s)],8+i));return c}
+  function findHeaderRow(rows){for(let i=0;i<Math.min(rows.length,60);i++){const n=(rows[i]||[]).map(v=>norm(v));if(n.some(v=>v==='ho va ten'||v.includes('ho va ten'))&&n.some(v=>v==='email'||v.includes('email')))return i}return -1}
+  function headerMap(h){const n=h.map(norm);const find=(arr,fb)=>{for(let i=0;i<n.length;i++)if(arr.some(x=>n[i]===x||n[i].includes(x)))return i;return fb};const c={fullName:find(['ho va ten','ho ten'],0),email:find(['email'],1),birthDate:find(['ngay sinh'],2),gender:find(['gioi tinh'],3),grade:find(['khoi lop'],4),address:find(['dia chi'],5),phone:find(['so dien thoai','sdt'],6),className:find(['ten lop'],7)};SUBJECTS.forEach((s,i)=>c[`subject${i+1}`]=find([norm(s)],8+i));return c}
   function cell(row,i){return i>=0?row[i]:''}
-  function getTextFromCell(cellNode,shared){const t=cellNode?.getAttribute('t');if(t==='inlineStr')return cellNode.querySelector('is t')?.textContent||'';const v=cellNode?.querySelector('v')?.textContent||'';if(t==='s')return shared[Number(v)]??'';return v}
-  function escXml(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;')}
+  function getSharedStrings(doc){return [...doc.querySelectorAll('si')].map(si=>[...si.querySelectorAll('t')].map(t=>t.textContent).join(''))}
   function colLetters(n){let s='';n++;while(n){let r=(n-1)%26;s=String.fromCharCode(65+r)+s;n=Math.floor((n-1)/26)}return s}
   function setXmlCell(doc,cellNode,text){for(const child of [...cellNode.children]){if(['v','is'].includes(child.localName))cellNode.removeChild(child)}if(!String(text??'')){cellNode.removeAttribute('t');return}cellNode.setAttribute('t','inlineStr');const is=doc.createElementNS('http://schemas.openxmlformats.org/spreadsheetml/2006/main','is');const t=doc.createElementNS('http://schemas.openxmlformats.org/spreadsheetml/2006/main','t');if(/^\s|\s$/.test(String(text)))t.setAttribute('xml:space','preserve');t.textContent=String(text);is.appendChild(t);cellNode.appendChild(is)}
-  function patchWorksheetXml(xml,shared,rows,students){const parser=new DOMParser();const doc=parser.parseFromString(xml,'application/xml');const sheetData=doc.querySelector('sheetData');if(!sheetData)return 0;const rowEls=[...sheetData.children].filter(x=>x.localName==='row');const headerIndex=findHeaderRow(rows);if(headerIndex<0)return 0;const cols=headerMap(rows[headerIndex]);const byKey=new Map(students.map(x=>[studentKey(x),x]));let updated=0;for(const rowEl of rowEls){const rn=Number(rowEl.getAttribute('r'))-1;if(rn<=headerIndex||rn>=rows.length)continue;const vals=rows[rn]||[];const name=cell(vals,cols.fullName),cls=cell(vals,cols.className);if(!String(name).trim())continue;const student=byKey.get(studentKey({fullName:name,className:cls}));if(!student)continue;const target={...student};const changes={fullName:target.fullName,email:target.email,birthDate:target.birthDate,gender:target.gender,grade:target.grade,address:target.address,phone:target.phone,className:target.className};SUBJECT_KEYS.forEach(k=>changes[k]=target[k]||'');for(const [key,val] of Object.entries(changes)){const cidx=cols[key];if(cidx<0)continue;const ref=`${colLetters(cidx)}${rn+1}`;let cellNode=[...rowEl.children].find(x=>x.localName==='c'&&x.getAttribute('r')===ref);if(!cellNode){cellNode=doc.createElementNS('http://schemas.openxmlformats.org/spreadsheetml/2006/main','c');cellNode.setAttribute('r',ref);const siblings=[...rowEl.children].filter(x=>x.localName==='c');const sample=siblings.find(x=>/^\D+/.exec(x.getAttribute('r')||'')?.[0]===colLetters(cidx));if(sample&&sample.getAttribute('s'))cellNode.setAttribute('s',sample.getAttribute('s'));rowEl.appendChild(cellNode)}setXmlCell(doc,cellNode,val)}updated++}return {xml:new XMLSerializer().serializeToString(doc),updated}}
-  async function patchOriginalXlsx(base64,students){if(typeof JSZip==='undefined')throw new Error('Thư viện ZIP chưa tải xong.');const bin=atob(base64),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);const parsed=XLSX.read(bytes,{type:'array',cellDates:true});const zip=await JSZip.loadAsync(bytes);let shared=[];const ss=zip.file('xl/sharedStrings.xml');if(ss){const sdoc=new DOMParser().parseFromString(await ss.async('text'),'application/xml');shared=[...sdoc.querySelectorAll('si')].map(si=>[...si.querySelectorAll('t')].map(t=>t.textContent).join(''))}
-    let updated=0;for(let i=0;i<parsed.SheetNames.length;i++){const f=`xl/worksheets/sheet${i+1}.xml`,entry=zip.file(f);if(!entry)continue;const ws=parsed.Sheets[parsed.SheetNames[i]];const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});const result=patchWorksheetXml(await entry.async('text'),shared,rows,students);if(result&&result.xml){zip.file(f,result.xml);updated+=result.updated}}
-    const out=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});return {blob:out,updated}}
-  $('export').onclick=async()=>{const btn=$('export');if(btn.disabled)return;try{busy(btn,true,'Đang xuất…');msg('Đang tạo file từ đúng mẫu Excel gốc…');const r=await post({action:'exportData',secret});if(!r.base64)throw new Error(r.error||'Không có file mẫu gốc.');const res=await patchOriginalXlsx(r.base64,r.students||[]);const stamp=new Date().toISOString().slice(0,10);await download(res.blob,`THPT_Bac_Yen_hoan_chinh_${stamp}.xlsx`);msg(`✓ Xuất xong. Đã điền ${res.updated} dòng vào chính mẫu gốc, không dựng lại bố cục.`,'ok');toast('✓ Đã tải file Excel hoàn chỉnh.','ok')}catch(e){console.error(e);msg(e.message||'Xuất Excel thất bại.','error');toast(e.message||'Xuất Excel thất bại.','error')}finally{busy(btn,false,'Xuất Excel')}};
+  function normalizeExportValue(v){return String(v??'').trim()}
+  function chooseExportValue(studentValue, originalValue){const sv=normalizeExportValue(studentValue);const ov=String(originalValue??'');return sv?sv:ov}
+  function buildStudentLookup(students){
+    const exact=new Map();const byName=new Map();
+    for(const s of students){
+      const k=studentKey(s); exact.set(k,s);
+      const nk=norm(s.fullName); if(!byName.has(nk))byName.set(nk,[]); byName.get(nk).push(s);
+    }
+    return {exact,byName};
+  }
+  function findStudent(lookup,name,cls){
+    const exact=lookup.exact.get(studentKey({fullName:name,className:cls})); if(exact)return exact;
+    const candidates=lookup.byName.get(norm(name))||[]; return candidates.length===1?candidates[0]:null;
+  }
+  function patchWorksheetXml(xml,rows,students){
+    const parser=new DOMParser();const doc=parser.parseFromString(xml,'application/xml');const sheetData=doc.querySelector('sheetData');if(!sheetData)return {xml,updated:0};
+    const rowEls=[...sheetData.children].filter(x=>x.localName==='row');const headerIndex=findHeaderRow(rows);if(headerIndex<0)return {xml,updated:0};
+    const cols=headerMap(rows[headerIndex]);const lookup=buildStudentLookup(students);let updated=0;
+    for(const rowEl of rowEls){
+      const excelRow=Number(rowEl.getAttribute('r'));const rn=excelRow-1;if(rn<=headerIndex||rn>=rows.length)continue;
+      const vals=rows[rn]||[];const name=cell(vals,cols.fullName),cls=cell(vals,cols.className);if(!normalizeExportValue(name))continue;
+      const student=findStudent(lookup,name,cls);if(!student)continue;
+      const fields=['fullName','email','birthDate','gender','grade','address','phone','className',...SUBJECT_KEYS];
+      let rowChanged=false;
+      for(const key of fields){
+        const cidx=cols[key];if(cidx<0)continue;
+        const ref=`${colLetters(cidx)}${excelRow}`;
+        const originalValue=cell(vals,cidx);
+        const val=chooseExportValue(student[key], originalValue);
+        if(String(val??'')===String(originalValue??''))continue;
+        let cellNode=[...rowEl.children].find(x=>x.localName==='c'&&x.getAttribute('r')===ref);
+        if(!cellNode){
+          cellNode=doc.createElementNS('http://schemas.openxmlformats.org/spreadsheetml/2006/main','c');cellNode.setAttribute('r',ref);
+          const col=colLetters(cidx);const sample=[...rowEl.children].find(x=>x.localName==='c'&&new RegExp('^[A-Z]+').exec(x.getAttribute('r')||'')?.[0]===col);if(sample&&sample.getAttribute('s'))cellNode.setAttribute('s',sample.getAttribute('s'));
+          rowEl.appendChild(cellNode);
+        }
+        setXmlCell(doc,cellNode,val);rowChanged=true;
+      }
+      if(rowChanged)updated++;
+    }
+    return {xml:new XMLSerializer().serializeToString(doc),updated};
+  }
+  async function patchOriginalXlsx(base64,students){
+    if(typeof JSZip==='undefined')throw new Error('Thư viện ZIP chưa tải xong.');
+    const bin=atob(base64),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+    const parsed=XLSX.read(bytes,{type:'array',cellDates:true});const zip=await JSZip.loadAsync(bytes);let updated=0;
+    for(let i=0;i<parsed.SheetNames.length;i++){
+      const f=`xl/worksheets/sheet${i+1}.xml`,entry=zip.file(f);if(!entry)continue;const ws=parsed.Sheets[parsed.SheetNames[i]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});const result=patchWorksheetXml(await entry.async('text'),rows,students);
+      if(result&&result.xml){zip.file(f,result.xml);updated+=result.updated}
+    }
+    const out=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});return {blob:out,updated}
+  }
+  $('export').onclick=async()=>{const btn=$('export');if(btn.disabled)return;try{busy(btn,true,'Đang xuất…');msg('Đang tạo file từ đúng mẫu Excel gốc…');const r=await post({action:'exportData',secret});if(!r.base64)throw new Error(r.error||'Không có file mẫu gốc.');const res=await patchOriginalXlsx(r.base64,r.students||[]);const stamp=new Date().toISOString().slice(0,10);await download(res.blob,`THPT_Bac_Yen_hoan_chinh_${stamp}.xlsx`);msg(`✓ Xuất xong. ${res.updated} dòng có dữ liệu được cập nhật; các ô gốc khác được giữ nguyên.`,'ok');toast('✓ Đã tải file Excel hoàn chỉnh.','ok')}catch(e){console.error(e);msg(e.message||'Xuất Excel thất bại.','error');toast(e.message||'Xuất Excel thất bại.','error')}finally{busy(btn,false,'Xuất Excel')}};
 
   function mark(v){return String(v||'').trim().toLowerCase()==='x'?'x':''}
   $('importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{msg('Đang đọc Excel và lưu chính file này làm mẫu gốc…');toast('Đang xử lý file Excel…');const buf=await f.arrayBuffer();const wb=XLSX.read(buf,{type:'array',cellDates:true});const ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false}),hi=findHeaderRow(rows);if(hi<0)throw new Error('Không tìm thấy dòng tiêu đề.');const data=rows.slice(hi+1).filter(r=>String(r[0]||'').trim());const payload=data.map(r=>({fullName:r[0],email:r[1],birthDate:r[2],gender:r[3],grade:r[4],address:r[5],phone:r[6],className:r[7],subject1:mark(r[8]),subject2:mark(r[9]),subject3:mark(r[10]),subject4:mark(r[11]),subject5:mark(r[12]),subject6:mark(r[13]),subject7:mark(r[14])}));if(!payload.length)throw new Error('Excel không có học sinh.');const out=await post({action:'importStudents',secret,students:payload,templateBase64:bytesToBase64(new Uint8Array(buf)),templateName:f.name});if(!out.ok)throw new Error(out.error||'Nhập Excel thất bại.');await load();msg(`✓ Đã nhập ${out.count} học sinh. File này được giữ nguyên làm mẫu xuất.`,'ok');toast(`Đã nhập ${out.count} học sinh.`,'ok')}catch(e){msg(e.message,'error');toast(e.message,'error')}finally{e.target.value=''}};

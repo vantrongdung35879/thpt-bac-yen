@@ -1,220 +1,37 @@
 (() => {
-  const api=(window.APP_CONFIG||{}).API_URL||'';
-  const $=id=>document.getElementById(id);
-  let secret='', dataset=[], filtered=[];
-  // Danh sách cột môn học phải dùng chung khi nhập/xuất Excel.
-  function msg(text,cls=''){ $('msg').textContent=text; $('msg').className=`msg ${cls}`; }
-  function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-  async function post(payload){
-    if(!api||api.includes('YOUR_GOOGLE')) throw new Error('Hệ thống chưa cấu hình API trong config.js.');
-    const r=await fetch(api,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow',cache:'no-store'});
-    const text=await r.text();
-    const trimmed=text.trim();
-    if(!trimmed) throw new Error('API không trả về dữ liệu.');
-    try { return JSON.parse(trimmed); }
-    catch(err){
-      const title = /<title[^>]*>(.*?)<\/title>/is.exec(trimmed);
-      const detail = title ? title[1].replace(/<[^>]+>/g,'').trim() : trimmed.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,220);
-      throw new Error('Google Apps Script đang trả về trang HTML thay vì JSON. Hãy kiểm tra URL Web App, quyền “Bất kỳ ai”, và triển khai phiên bản mới. Chi tiết: '+detail);
-    }
-  }
-  async function load(){
-    setBusy_($('refresh'),true,'Đang tải…');
-    try{
-      const r=await post({action:'adminList',secret}); if(!r.ok) throw new Error(r.error||'Không thể tải dữ liệu.');
-      dataset=Array.isArray(r.students)?r.students:[]; updateClassFilter_(); render();
-    } finally { setBusy_($('refresh'),false,'Làm mới'); }
-  }
-  function updateClassFilter_(){
-    const sel=$('classFilter'), cur=sel.value;
-    const cls=[...new Set(dataset.map(x=>String(x.className||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
-    sel.innerHTML='<option value="">Tất cả lớp</option>'+cls.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
-    if(cls.includes(cur)) sel.value=cur;
-  }
-  function setBusy_(btn,busy,text){ if(!btn)return; btn.disabled=busy; btn.classList.toggle('busy',busy); btn.innerHTML=busy?'<span class="mini-spinner"></span>'+text:text; }
-  function toast_(text,cls=''){ const el=document.createElement('div'); el.className='toast '+cls; el.textContent=text; document.body.appendChild(el); requestAnimationFrame(()=>el.classList.add('show')); setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),220)},1800); }
-  function render(){
-    const q=$('search').value.trim().toLowerCase(), c=$('classFilter').value, s=$('statusFilter').value;
-    const list=dataset.filter(x=>{
-      const name=String(x.fullName||'').toLowerCase();
-      return (!q||name.includes(q))&&(!c||x.className===c)&&(!s||(s==='done'?!!x.completed:!x.completed));
-    });
-    const base=new URL(location.href); base.pathname=base.pathname.replace(/admin\.html$/i,''); base.search=''; base.hash='';
-    filtered=list;
-    $('rows').innerHTML=list.map(x=>{
-      const subjects=['subject1','subject2','subject3','subject4','subject5','subject6','subject7'].filter(k=>x[k]).map((k,i)=>['Toán','Tiếng Anh','Vật lí','Hóa học','Sinh học','Lịch sử','Địa lý'][Number(k.replace('subject',''))-1]).join(', ');
-      const url=`${base.toString()}?id=${encodeURIComponent(x.token)}`;
-      return `<tr><td><strong>${esc(x.fullName)}</strong></td><td>${esc(x.className||'')}</td><td>${esc(x.email||'')}</td><td>${esc(x.phone||'')}</td><td>${esc(subjects)}</td><td><span class="pill ${x.completed?'good':'pending'}">${x.completed?'Đã hoàn thành':'Chưa hoàn thành'}</span></td><td><button class="copy" data-url="${esc(url)}">Copy link</button></td></tr>`;
-    }).join('') || '<tr><td colspan="7" style="text-align:center;padding:24px">Chưa có học sinh.</td></tr>';
-    document.querySelectorAll('button.copy').forEach(b=>b.onclick=async()=>{
-      try{ await navigator.clipboard.writeText(b.dataset.url); b.textContent='✓ Đã copy'; b.classList.add('copied'); toast_('Đã sao chép link học sinh.','ok'); setTimeout(()=>{b.textContent='Copy link';b.classList.remove('copied')},1200); }
-      catch(e){ prompt('Sao chép link này:',b.dataset.url); }
-    });
-    const total=dataset.length, done=dataset.filter(x=>!!x.completed).length;
-    $('total').textContent=total; $('done').textContent=done; $('pending').textContent=total-done; $('progress').textContent=total?`${Math.round(done*100/total)}%`:'0%';
-  }
-  async function login(){
-    secret=$('password').value.trim(); if(!secret) return;
-    try{
-      const r=await post({action:'adminCheck',secret}); if(!r.ok) throw new Error(r.error||'Sai mật khẩu.');
-      $('login').classList.add('hidden'); $('admin').classList.remove('hidden'); $('logout').classList.remove('hidden'); await load();
-    }catch(e){ $('loginMsg').textContent=e.message; $('loginMsg').className='msg error'; }
-  }
-  $('loginForm').onsubmit=e=>{e.preventDefault();login();};
-  $('logout').onclick=()=>location.reload();
-  $('refresh').onclick=()=>load().then(()=>{msg('✓ Dữ liệu đã được làm mới.','ok');toast_('Đã cập nhật dữ liệu mới nhất.','ok')}).catch(e=>{msg(e.message,'error');toast_(e.message,'error')});
-  ['search','classFilter','statusFilter'].forEach(id=>$(id).addEventListener('input',render));
+  const api=(window.APP_CONFIG||{}).API_URL||'';const $=id=>document.getElementById(id);let secret='',dataset=[];
+  const SUBJECTS=['Toán','Tiếng Anh','Vật lí','Hóa học','Sinh học','Lịch sử','Địa lý'];const SUBJECT_KEYS=SUBJECTS.map((_,i)=>`subject${i+1}`);
+  const enc=(s)=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const norm=(s)=>String(s??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+  const studentKey=x=>`${norm(x.fullName)}||${norm(x.className)}`;
+  const msg=(t,c='')=>{$('msg').textContent=t;$('msg').className=`msg ${c}`};
+  function toast(text,cls=''){const el=document.createElement('div');el.className=`toast ${cls}`;el.textContent=text;document.getElementById('toastRoot').appendChild(el);requestAnimationFrame(()=>el.classList.add('show'));setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),180)},2400)}
+  function theme(t){document.documentElement.dataset.theme=t;localStorage.setItem('thpt_theme',t);$('themeIcon').textContent=t==='dark'?'☀':'☾';$('themeText').textContent=t==='dark'?'Sáng':'Tối'}
+  $('themeToggle').onclick=()=>theme(document.documentElement.dataset.theme==='dark'?'light':'dark');theme(localStorage.getItem('thpt_theme')||'light');
+  function busy(btn,on,label){btn.disabled=on;btn.innerHTML=on?`<span class="mini-spinner"></span>${label}`:label}
+  async function post(payload){if(!api||api.includes('YOUR_GOOGLE'))throw new Error('Chưa cấu hình API.');const r=await fetch(api,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow',cache:'no-store'});const text=await r.text();if(!text.trim())throw new Error('API không trả dữ liệu.');let data;try{data=JSON.parse(text)}catch{throw new Error('Google Apps Script trả HTML thay vì JSON. Hãy kiểm tra URL Web App và triển khai phiên bản mới.')}if(!data.ok)throw new Error(data.error||'API báo lỗi.');return data}
+  async function load(){busy($('refresh'),true,'Đang tải…');$('table-wrap')?.classList.add('loading');try{const r=await post({action:'adminList',secret});dataset=r.students||[];updateFilters();render();msg(`✓ Đã tải ${dataset.length} học sinh.`,'ok')}catch(e){msg(e.message,'error');toast(e.message,'error')}finally{busy($('refresh'),false,'Làm mới');$('table-wrap')?.classList.remove('loading')}}
+  function updateFilters(){const sel=$('classFilter'),cur=sel.value;const classes=[...new Set(dataset.map(x=>String(x.className||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));sel.innerHTML='<option value="">Tất cả lớp</option>'+classes.map(c=>`<option>${enc(c)}</option>`).join('');if(classes.includes(cur))sel.value=cur}
+  function render(){const q=$('search').value.trim().toLowerCase(),c=$('classFilter').value,s=$('statusFilter').value;const rows=dataset.filter(x=>(!q||String(x.fullName||'').toLowerCase().includes(q))&&(!c||x.className===c)&&(!s||(s==='done'?!!x.completed:!x.completed)));const base=new URL(location.href);base.pathname=base.pathname.replace(/admin\.html$/i,'');base.search='';base.hash='';$('rows').innerHTML=rows.map(x=>{const subjects=SUBJECT_KEYS.filter(k=>x[k]).map(k=>SUBJECTS[Number(k.slice(-1))-1]).join(', ');const url=`${base.toString()}?id=${encodeURIComponent(x.token)}`;return `<tr><td><strong>${enc(x.fullName)}</strong></td><td>${enc(x.className||'')}</td><td>${enc(x.email||'')}</td><td>${enc(x.phone||'')}</td><td>${enc(subjects)}</td><td><span class="pill ${x.completed?'good':'pending'}">${x.completed?'Đã hoàn thành':'Chưa hoàn thành'}</span></td><td><button class="copy" data-url="${enc(url)}">Copy link</button></td></tr>`}).join('')||'<tr><td colspan="7" style="text-align:center;padding:24px">Không có dữ liệu phù hợp.</td></tr>';
+    document.querySelectorAll('.copy').forEach(b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(b.dataset.url);b.textContent='✓ Đã copy';b.classList.add('copied');toast('Đã sao chép link.','ok');setTimeout(()=>{b.textContent='Copy link';b.classList.remove('copied')},1200)}catch{prompt('Copy link:',b.dataset.url)}});const total=dataset.length,done=dataset.filter(x=>!!x.completed).length;$('total').textContent=total;$('done').textContent=done;$('pending').textContent=total-done;$('progress').textContent=total?`${Math.round(done*100/total)}%`:'0%'}
+  async function login(){secret=$('password').value.trim();if(!secret)return;try{const r=await post({action:'adminCheck',secret});if(!r.ok)throw new Error(r.error||'Sai mật khẩu.');$('login').classList.add('hidden');$('admin').classList.remove('hidden');$('logout').classList.remove('hidden');await load()}catch(e){$('loginMsg').textContent=e.message;$('loginMsg').className='msg error'}}
+  $('loginForm').onsubmit=e=>{e.preventDefault();login()};$('logout').onclick=()=>location.reload();$('refresh').onclick=load;['search','classFilter','statusFilter'].forEach(id=>$(id).addEventListener('input',render));
 
-  async function downloadBlob_(blob, filename){
-    const url=URL.createObjectURL(blob);
-    try{
-      const a=document.createElement('a');
-      a.style.display='none';
-      a.href=url;
-      a.download=filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      // Một số trình duyệt cần thêm một nhịp để nhận lệnh tải xuống.
-      await new Promise(r=>setTimeout(r,300));
-    }finally{
-      setTimeout(()=>URL.revokeObjectURL(url),1200);
-    }
-  }
+  async function download(blob,filename){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
+  function bytesToBase64(bytes){let out='';for(let i=0;i<bytes.length;i+=0x8000)out+=String.fromCharCode(...bytes.subarray(i,Math.min(i+0x8000,bytes.length)));return btoa(out)}
+  function findHeaderRow(rows){for(let i=0;i<Math.min(rows.length,40);i++){const n=(rows[i]||[]).map(v=>norm(v));if(n.some(v=>v.includes('ho va ten')||v.includes('ho ten'))&&n.some(v=>v.includes('email')))return i}return -1}
+  function headerMap(h){const n=h.map(norm);const find=(arr,fb)=>{for(let i=0;i<n.length;i++)if(arr.some(x=>n[i].includes(x)))return i;return fb};const c={fullName:find(['ho va ten','ho ten'],0),email:find(['email'],1),birthDate:find(['ngay sinh'],2),gender:find(['gioi tinh'],3),grade:find(['khoi lop'],4),address:find(['dia chi'],5),phone:find(['so dien thoai'],6),className:find(['ten lop'],7)};SUBJECTS.forEach((s,i)=>c[`subject${i+1}`]=find([norm(s)],8+i));return c}
+  function cell(row,i){return i>=0?row[i]:''}
+  function getTextFromCell(cellNode,shared){const t=cellNode?.getAttribute('t');if(t==='inlineStr')return cellNode.querySelector('is t')?.textContent||'';const v=cellNode?.querySelector('v')?.textContent||'';if(t==='s')return shared[Number(v)]??'';return v}
+  function escXml(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;')}
+  function colLetters(n){let s='';n++;while(n){let r=(n-1)%26;s=String.fromCharCode(65+r)+s;n=Math.floor((n-1)/26)}return s}
+  function setXmlCell(doc,cellNode,text){for(const child of [...cellNode.children]){if(['v','is'].includes(child.localName))cellNode.removeChild(child)}if(!String(text??'')){cellNode.removeAttribute('t');return}cellNode.setAttribute('t','inlineStr');const is=doc.createElementNS('http://schemas.openxmlformats.org/spreadsheetml/2006/main','is');const t=doc.createElementNS('http://schemas.openxmlformats.org/spreadsheetml/2006/main','t');if(/^\s|\s$/.test(String(text)))t.setAttribute('xml:space','preserve');t.textContent=String(text);is.appendChild(t);cellNode.appendChild(is)}
+  function patchWorksheetXml(xml,shared,rows,students){const parser=new DOMParser();const doc=parser.parseFromString(xml,'application/xml');const sheetData=doc.querySelector('sheetData');if(!sheetData)return 0;const rowEls=[...sheetData.children].filter(x=>x.localName==='row');const headerIndex=findHeaderRow(rows);if(headerIndex<0)return 0;const cols=headerMap(rows[headerIndex]);const byKey=new Map(students.map(x=>[studentKey_(x),x]));let updated=0;for(const rowEl of rowEls){const rn=Number(rowEl.getAttribute('r'))-1;if(rn<=headerIndex||rn>=rows.length)continue;const vals=rows[rn]||[];const name=cell(vals,cols.fullName),cls=cell(vals,cols.className);if(!String(name).trim())continue;const student=byKey.get(studentKey_({fullName:name,className:cls}));if(!student)continue;const target={...student};const changes={fullName:target.fullName,email:target.email,birthDate:target.birthDate,gender:target.gender,grade:target.grade,address:target.address,phone:target.phone,className:target.className};SUBJECT_KEYS.forEach(k=>changes[k]=target[k]||'');for(const [key,val] of Object.entries(changes)){const cidx=cols[key];if(cidx<0)continue;const ref=`${colLetters(cidx)}${rn+1}`;let cellNode=[...rowEl.children].find(x=>x.localName==='c'&&x.getAttribute('r')===ref);if(!cellNode){cellNode=doc.createElementNS('http://schemas.openxmlformats.org/spreadsheetml/2006/main','c');cellNode.setAttribute('r',ref);const siblings=[...rowEl.children].filter(x=>x.localName==='c');const sample=siblings.find(x=>/^\D+/.exec(x.getAttribute('r')||'')?.[0]===colLetters(cidx));if(sample&&sample.getAttribute('s'))cellNode.setAttribute('s',sample.getAttribute('s'));rowEl.appendChild(cellNode)}setXmlCell(doc,cellNode,val)}updated++}return {xml:new XMLSerializer().serializeToString(doc),updated}}
+  async function patchOriginalXlsx(base64,students){if(typeof JSZip==='undefined')throw new Error('Thư viện ZIP chưa tải xong.');const bin=atob(base64),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);const parsed=XLSX.read(bytes,{type:'array',cellDates:true});const zip=await JSZip.loadAsync(bytes);let shared=[];const ss=zip.file('xl/sharedStrings.xml');if(ss){const sdoc=new DOMParser().parseFromString(await ss.async('text'),'application/xml');shared=[...sdoc.querySelectorAll('si')].map(si=>[...si.querySelectorAll('t')].map(t=>t.textContent).join(''))}
+    let updated=0;for(let i=0;i<parsed.SheetNames.length;i++){const f=`xl/worksheets/sheet${i+1}.xml`,entry=zip.file(f);if(!entry)continue;const ws=parsed.Sheets[parsed.SheetNames[i]];const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});const result=patchWorksheetXml(await entry.async('text'),shared,rows,students);if(result&&result.xml){zip.file(f,result.xml);updated+=result.updated}}
+    const out=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});return {blob:out,updated}}
+  $('export').onclick=async()=>{const btn=$('export');if(btn.disabled)return;try{busy(btn,true,'Đang xuất…');msg('Đang tạo file từ đúng mẫu Excel gốc…');const r=await post({action:'exportData',secret});if(!r.base64)throw new Error(r.error||'Không có file mẫu gốc.');const res=await patchOriginalXlsx(r.base64,r.students||[]);const stamp=new Date().toISOString().slice(0,10);await download(res.blob,`THPT_Bac_Yen_hoan_chinh_${stamp}.xlsx`);msg(`✓ Xuất xong. Đã điền ${res.updated} dòng vào chính mẫu gốc, không dựng lại bố cục.`,'ok');toast('✓ Đã tải file Excel hoàn chỉnh.','ok')}catch(e){console.error(e);msg(e.message||'Xuất Excel thất bại.','error');toast(e.message||'Xuất Excel thất bại.','error')}finally{busy(btn,false,'Xuất Excel')}};
 
-  $('export').onclick=async()=>{
-    const btn=$('export');
-    if(btn.disabled) return;
-    try{
-      if(typeof XLSX==='undefined') throw new Error('Thư viện Excel chưa tải xong. Hãy chờ 2–3 giây rồi bấm Xuất Excel lại.');
-      setBusy_(btn,true,'Đang xuất…');
-      msg('Đang lấy dữ liệu mới nhất và tạo file Excel…');
-      const r=await post({action:'exportData',secret});
-      if(!r||!r.ok) throw new Error(r?.error||'Không thể lấy dữ liệu xuất.');
-      if(!r.base64) throw new Error('Backend không trả về file Excel mẫu. Dữ liệu học sinh không bị xóa. Hãy kiểm tra file mẫu đã được lưu khi Nhập Excel chưa.');
-
-      const bin=atob(r.base64), bytes=new Uint8Array(bin.length);
-      for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
-      const wb=XLSX.read(bytes,{type:'array',cellDates:true});
-      const students=Array.isArray(r.students)?r.students:[];
-      const byKey=new Map(students.map(x=>[studentKey_(x),x]));
-      let updated=0;
-
-      wb.SheetNames.forEach((sheetName, sheetIndex)=>{
-        const ws=wb.Sheets[sheetName];
-        const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
-        const headerIndex=findHeaderRow_(rows);
-        if(headerIndex<0) return;
-        const header=rows[headerIndex]||[];
-        const cols=headerMap_(header);
-        for(let i=headerIndex+1;i<rows.length;i++){
-          const row=rows[i]||[];
-          const name=cell_(row,cols.fullName), cls=cell_(row,cols.className);
-          if(!String(name).trim()) continue;
-          const student=byKey.get(studentKey_({fullName:name,className:cls}));
-          if(!student) continue;
-          ensureRowLength_(row,Math.max(...Object.values(cols).filter(v=>v>=0),14)+1);
-          // Chỉ thay các trường thuộc hệ thống; mọi nội dung/định dạng khác của mẫu được giữ nguyên.
-          setCell_(row,cols.fullName,student.fullName);
-          setCell_(row,cols.email,student.email);
-          setCell_(row,cols.birthDate,student.birthDate);
-          setCell_(row,cols.gender,student.gender);
-          setCell_(row,cols.grade,student.grade);
-          setCell_(row,cols.address,student.address);
-          setCell_(row,cols.phone,student.phone);
-          setCell_(row,cols.className,student.className);
-          const subjectKeys=['subject1','subject2','subject3','subject4','subject5','subject6','subject7'];
-          subjectKeys.forEach(k=>setCell_(row,cols[k],student[k]||''));
-          for(let c=0;c<row.length;c++) setWsCell_(ws,i,c,row[c]);
-          updated++;
-        }
-        if(sheetIndex===0){
-          setWsCell_(ws,0,0,'Danh sách đăng ký tài khoản học sinh Trường THPT Bắc Yên');
-          setWsCell_(ws,1,0,`Tổng số lớp : ${new Set(students.map(x=>String(x.className||'').trim()).filter(Boolean)).size} lớp.`);
-          setWsCell_(ws,2,0,`Tổng số học sinh: ${students.length}`);
-        }
-      });
-
-      const out=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
-      const blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-      const stamp=new Date().toISOString().slice(0,10);
-      const filename=`THPT_Bac_Yen_da_cap_nhat_${stamp}.xlsx`;
-      await downloadBlob_(blob,filename);
-      msg(`✓ Đã tạo file Excel thành công: ${filename} (${updated} dòng được cập nhật).`,'ok');
-      toast_('✓ File Excel đã được tải xuống. Kiểm tra thư mục Tải xuống của trình duyệt.','ok');
-    }catch(e){
-      console.error(e);
-      msg(e.message||'Có lỗi khi xuất Excel.','error');
-      toast_(e.message||'Xuất Excel thất bại.','error');
-    }finally{setBusy_(btn,false,'Xuất Excel');}
-  };
-
-  $('importFile').onchange=async e=>{
-    const f=e.target.files[0]; if(!f) return;
-    try{
-      msg('Đang đọc file Excel và lưu mẫu gốc…');
-      toast_('Đang xử lý file Excel, vui lòng chờ…');
-      const arrayBuffer=await f.arrayBuffer();
-      const wb=XLSX.read(arrayBuffer,{type:'array',cellDates:true});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
-      const headerIndex=findHeaderRow_(rows); if(headerIndex<0) throw new Error('Không tìm thấy dòng tiêu đề của bảng Excel.');
-      const data=rows.slice(headerIndex+1).filter(r=>String(r[0]||'').trim());
-      const payload=data.map(r=>({
-        fullName:r[0], email:r[1], birthDate:r[2], gender:r[3], grade:r[4], address:r[5], phone:r[6], className:r[7],
-        subject1:mark_(r[8]),subject2:mark_(r[9]),subject3:mark_(r[10]),subject4:mark_(r[11]),subject5:mark_(r[12]),subject6:mark_(r[13]),subject7:mark_(r[14])
-      }));
-      if(!payload.length) throw new Error('File Excel không có học sinh để nhập.');
-      const base64=bytesToBase64_(new Uint8Array(arrayBuffer));
-      const out=await post({action:'importStudents',secret,students:payload,templateBase64:base64,templateName:f.name});
-      if(!out.ok) throw new Error(out.error||'Không thể nhập dữ liệu.');
-      await load(); msg(`✓ Đã nhập ${out.count} học sinh. Mẫu Excel gốc đã được lưu.`,'ok'); toast_(`Đã nhập ${out.count} học sinh.`,'ok');
-    }catch(err){msg(err.message,'error');}
-    finally{e.target.value='';}
-  };
-  function bytesToBase64_(bytes){
-    let binary=''; const chunk=0x8000;
-    for(let i=0;i<bytes.length;i+=chunk) binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+chunk,bytes.length)));
-    return btoa(binary);
-  }
-
-  function findHeaderRow_(rows){
-    for(let i=0;i<Math.min(rows.length,40);i++){
-      const h=rows[i]||[];
-      const norm=h.map(v=>norm_(v));
-      const hasName=norm.some(v=>v.includes('ho va ten')||v.includes('ho ten'));
-      const hasEmail=norm.some(v=>v.includes('email'));
-      if(hasName && hasEmail) return i;
-    }
-    return -1;
-  }
-  function norm_(v){
-    return String(v??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
-  }
-  function headerMap_(header){
-    const norm=header.map(v=>norm_(v));
-    const find=(patterns,fallback=-1)=>{ for(let i=0;i<norm.length;i++) if(patterns.some(p=>norm[i].includes(p))) return i; return fallback; };
-    const cols={
-      fullName:find(['ho va ten','ho ten'],0), email:find(['email'],1), birthDate:find(['ngay sinh'],2),
-      gender:find(['gioi tinh'],3), grade:find(['khoi lop'],4), address:find(['dia chi'],5),
-      phone:find(['so dien thoai'],6), className:find(['ten lop'],7)
-    };
-    const subjectKeys=['subject1','subject2','subject3','subject4','subject5','subject6','subject7'];
-    const subjectNames=['Toán','Tiếng Anh','Vật lí','Hóa học','Sinh học','Lịch sử','Địa lý'];
-    subjectNames.forEach((name,idx)=>cols[subjectKeys[idx]]=find([norm_(name)],8+idx));
-    return cols;
-  }
-  function studentKey_(x){return `${norm_(x.fullName)}||${norm_(x.className)}`;}
-  function cell_(row,i){return i>=0?row[i]:'';}
-  function setCell_(row,i,v){if(i>=0)row[i]=v;}
-  function ensureRowLength_(row,n){while(row.length<n)row.push('');}
-  function setWsCell_(ws,r,c,v){
-    if(c<0) return;
-    const addr=XLSX.utils.encode_cell({r,c});
-    const old=ws[addr];
-    if(old){old.v=v; if(typeof v==='number') old.t='n'; else if(v instanceof Date){old.v=v;old.t='d';} else old.t='s';}
-    else ws[addr]={t:'s',v:v};
-  }
-
-  function mark_(v){ return String(v||'').trim().toLowerCase()==='x'?'x':''; }
+  function mark(v){return String(v||'').trim().toLowerCase()==='x'?'x':''}
+  $('importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{msg('Đang đọc Excel và lưu chính file này làm mẫu gốc…');toast('Đang xử lý file Excel…');const buf=await f.arrayBuffer();const wb=XLSX.read(buf,{type:'array',cellDates:true});const ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false}),hi=findHeaderRow(rows);if(hi<0)throw new Error('Không tìm thấy dòng tiêu đề.');const data=rows.slice(hi+1).filter(r=>String(r[0]||'').trim());const payload=data.map(r=>({fullName:r[0],email:r[1],birthDate:r[2],gender:r[3],grade:r[4],address:r[5],phone:r[6],className:r[7],subject1:mark(r[8]),subject2:mark(r[9]),subject3:mark(r[10]),subject4:mark(r[11]),subject5:mark(r[12]),subject6:mark(r[13]),subject7:mark(r[14])}));if(!payload.length)throw new Error('Excel không có học sinh.');const out=await post({action:'importStudents',secret,students:payload,templateBase64:bytesToBase64(new Uint8Array(buf)),templateName:f.name});if(!out.ok)throw new Error(out.error||'Nhập Excel thất bại.');await load();msg(`✓ Đã nhập ${out.count} học sinh. File này được giữ nguyên làm mẫu xuất.`,'ok');toast(`Đã nhập ${out.count} học sinh.`,'ok')}catch(e){msg(e.message,'error');toast(e.message,'error')}finally{e.target.value=''}};
 })();

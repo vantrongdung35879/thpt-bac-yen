@@ -1,51 +1,51 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" data-theme="light">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>THPT Bắc Yên – Bổ sung thông tin học sinh</title>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#4f46e5"><meta name="color-scheme" content="light dark">
+  <title>THPT Bắc Yên – Hoàn thiện thông tin</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main class="shell">
-    <section class="card hero">
-      <div class="brand">THPT BẮC YÊN</div>
+    <header class="topbar card glass">
+      <div class="brand-wrap"><div class="brand-mark">BY</div><div><div class="brand">THPT BẮC YÊN</div><div class="tiny">Cổng hoàn thiện thông tin học sinh</div></div></div>
+      <button id="themeToggle" class="icon-btn" type="button" aria-label="Đổi giao diện sáng tối"><span id="themeIcon">☾</span><span id="themeText">Tối</span></button>
+    </header>
+
+    <section class="hero card glass">
+      <div class="eyebrow">CẬP NHẬT TRỰC TUYẾN</div>
       <h1>Hoàn thiện thông tin học sinh</h1>
-      <p class="muted">Hệ thống chỉ hiển thị những thông tin bạn còn thiếu.</p>
+      <p class="muted">Hệ thống tự nhận diện tài khoản và chỉ hiển thị những thông tin cần bổ sung.</p>
+      <div class="hero-badges"><span class="soft-badge">Nhanh</span><span class="soft-badge">An toàn</span><span class="soft-badge">Dễ sử dụng</span></div>
     </section>
 
-    <section id="loading" class="card center"><div class="spinner"></div><p>Đang nhận diện học sinh…</p></section>
+    <section id="loading" class="card glass center"><div class="spinner"></div><strong>Đang nhận diện học sinh…</strong><p class="muted">Chỉ mất vài giây.</p></section>
 
-    <section id="error" class="card hidden">
-      <h2>Không thể mở biểu mẫu</h2>
-      <p id="errorText" class="error-text"></p>
-      <p class="muted">Hãy dùng đúng đường dẫn cá nhân do nhà trường cung cấp.</p>
+    <section id="error" class="card glass hidden">
+      <div class="error-icon">!</div><h2>Không thể mở biểu mẫu</h2><p id="errorText" class="error-text"></p><p class="muted">Hãy sử dụng đúng đường dẫn cá nhân do nhà trường cung cấp.</p>
     </section>
 
     <section id="studentApp" class="hidden">
-      <div class="card student-head">
-        <div>
-          <div class="eyebrow">HỌC SINH</div>
-          <h2 id="studentName"></h2>
-          <p id="studentClass" class="muted"></p>
-        </div>
+      <div class="card glass student-head">
+        <div><div class="eyebrow">HỌC SINH</div><h2 id="studentName"></h2><p id="studentClass" class="muted"></p></div>
         <div id="statusBadge" class="status pending">Chưa hoàn thành</div>
       </div>
 
-      <form id="studentForm" class="card form-card" novalidate>
+      <form id="studentForm" class="card glass form-card" novalidate>
+        <div class="section-heading"><div><h3>Thông tin cần bổ sung</h3><p class="muted">Các thông tin đã có sẵn sẽ không cần nhập lại.</p></div><span class="hint-chip">* Bắt buộc</span></div>
         <div id="fields"></div>
-        <div id="emptyState" class="success-panel hidden">
-          <strong>✓ Bạn đã điền đủ thông tin.</strong>
-          <span>Bấm nút bên dưới để xác nhận hoàn thành.</span>
-        </div>
-        <div class="form-actions">
-          <button id="submitBtn" class="btn primary" type="submit"><span>LƯU VÀ HOÀN THÀNH</span></button>
-        </div>
+        <div class="section-divider"></div>
+        <div id="subjectSection"></div>
+        <div id="emptyState" class="success-panel hidden"><div class="success-icon">✓</div><div><strong>Bạn đã điền đủ thông tin bắt buộc.</strong><span>Vẫn có thể cập nhật số điện thoại và môn đăng ký.</span></div></div>
+        <div class="form-actions"><button id="submitBtn" class="btn primary" type="submit"><span class="btn-label">LƯU VÀ HOÀN THÀNH</span></button></div>
         <div id="formMessage" class="form-message" aria-live="polite"></div>
       </form>
     </section>
+
+    <footer class="footer muted">THPT Bắc Yên · Hệ thống cập nhật thông tin học sinh</footer>
   </main>
   <script src="config.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=9.0"></script>
 </body>
 </html>

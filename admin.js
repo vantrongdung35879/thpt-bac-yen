@@ -18,6 +18,20 @@
   async function login(){secret=$('password').value.trim();if(!secret)return;try{const r=await post({action:'adminCheck',secret});if(!r.ok)throw new Error(r.error||'Sai mật khẩu.');$('login').classList.add('hidden');$('admin').classList.remove('hidden');$('logout').classList.remove('hidden');await load()}catch(e){$('loginMsg').textContent=e.message;$('loginMsg').className='msg error'}}
   $('loginForm').onsubmit=e=>{e.preventDefault();login()};$('logout').onclick=()=>location.reload();$('refresh').onclick=load;['search','classFilter','statusFilter'].forEach(id=>$(id).addEventListener('input',render));
 
+  function assistantReply(q){
+    const t=String(q||'').toLowerCase();
+    if(t.includes('nhập')&&t.includes('excel')) return 'Vào “Nhập Excel”, chọn file gốc. Hệ thống sẽ lưu chính file đó làm mẫu và cập nhật dữ liệu học sinh mà không xóa dữ liệu hiện có.';
+    if(t.includes('xuất')&&t.includes('excel')) return 'Bấm “Xuất Excel” một lần. V13 giữ nguyên workbook gốc và chèn dữ liệu vào đúng ô, kể cả Email, SĐT và các dấu x môn học.';
+    if(t.includes('link')||t.includes('học sinh')) return 'Trong danh sách, bấm “Copy link” ở đúng học sinh rồi gửi link đó cho bạn ấy. Không gửi nhầm link của người khác.';
+    if(t.includes('dữ liệu')||t.includes('mất')) return 'Không bấm “Nhập Excel” lại nếu dữ liệu hiện tại đang đúng. Bản V13 được thiết kế để không ghi đè ô đã có dữ liệu bằng giá trị trống.';
+    if(t.includes('sáng')||t.includes('tối')||t.includes('theme')) return 'Nút “Sáng/Tối” ở góc trên phải sẽ đổi giao diện ngay và tự ghi nhớ lựa chọn cho lần mở sau.';
+    if(t.includes('chưa hoàn thành')||t.includes('trạng thái')) return 'Trạng thái được tính từ các trường bắt buộc. Bạn có thể bấm “Làm mới” để đọc lại dữ liệu mới nhất từ hệ thống.';
+    if(t.includes('lag')||t.includes('chậm')) return 'V13 giảm gọi API không cần thiết ở trang học sinh, còn Admin có cache ngắn và chỉ tải lại khi bạn bấm “Làm mới”.';
+    return 'Mình có thể hướng dẫn: Nhập Excel, Xuất Excel, Copy link, kiểm tra trạng thái, Sáng/Tối và xử lý dữ liệu. Hãy thử một nút gợi ý bên dưới.';
+  }
+  function addAssistantMessage(text,who='bot'){const box=$('assistantMessages');if(!box)return;const el=document.createElement('div');el.className=`assistant-msg ${who}`;el.textContent=text;box.appendChild(el);box.scrollTop=box.scrollHeight;}
+  function initAssistant(){const panel=$('assistant'),toggle=$('assistantToggle'),close=$('assistantClose'),form=$('assistantForm'),input=$('assistantInput');if(!panel||!toggle)return;const open=()=>{panel.classList.remove('hidden');input?.focus()};toggle.onclick=open;close?.addEventListener('click',()=>panel.classList.add('hidden'));document.querySelectorAll('[data-ai]').forEach(b=>b.addEventListener('click',()=>{const q=b.dataset.ai;addAssistantMessage(q,'user');setTimeout(()=>addAssistantMessage(assistantReply(q),'bot'),160)}));form?.addEventListener('submit',e=>{e.preventDefault();const q=input.value.trim();if(!q)return;addAssistantMessage(q,'user');input.value='';setTimeout(()=>addAssistantMessage(assistantReply(q),'bot'),180)});}
+  initAssistant();
   async function download(blob,filename){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
   function bytesToBase64(bytes){let out='';for(let i=0;i<bytes.length;i+=0x8000)out+=String.fromCharCode(...bytes.subarray(i,Math.min(i+0x8000,bytes.length)));return btoa(out)}
   function findHeaderRow(rows){for(let i=0;i<Math.min(rows.length,60);i++){const n=(rows[i]||[]).map(v=>norm(v));if(n.some(v=>v==='ho va ten'||v.includes('ho va ten'))&&n.some(v=>v==='email'||v.includes('email')))return i}return -1}
@@ -60,7 +74,9 @@
         if(!cellNode){
           cellNode=doc.createElementNS('http://schemas.openxmlformats.org/spreadsheetml/2006/main','c');cellNode.setAttribute('r',ref);
           const col=colLetters(cidx);const sample=[...rowEl.children].find(x=>x.localName==='c'&&new RegExp('^[A-Z]+').exec(x.getAttribute('r')||'')?.[0]===col);if(sample&&sample.getAttribute('s'))cellNode.setAttribute('s',sample.getAttribute('s'));
-          rowEl.appendChild(cellNode);
+          const targetIdx=cidx;
+          const next=[...rowEl.children].filter(x=>x.localName==='c').find(x=>{const m=(x.getAttribute('r')||'').match(/^([A-Z]+)/);if(!m)return false;let n=0;for(const ch of m[1])n=n*26+(ch.charCodeAt(0)-64);return n-1>targetIdx;});
+          if(next) rowEl.insertBefore(cellNode,next); else rowEl.appendChild(cellNode);
         }
         setXmlCell(doc,cellNode,val);rowChanged=true;
       }

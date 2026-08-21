@@ -52,7 +52,11 @@
       }else{
         el=document.createElement('input'); el.type=meta.type; el.placeholder=meta.placeholder||''; el.value=fieldValue(student,key);
       }
-      el.name=key; if(meta.required) el.required=true; wrap.appendChild(el); root.appendChild(wrap);
+      el.name=key;
+      if(meta.required) el.required=true;
+      el.addEventListener('input',()=>wrap.classList.add('filled'));
+      el.addEventListener('change',()=>wrap.classList.add('filled'));
+      wrap.appendChild(el); root.appendChild(wrap);
     });
 
     const subWrap=document.createElement('div'); subWrap.className='field';
@@ -73,8 +77,14 @@
 
   $('studentForm').addEventListener('submit',async e=>{
     e.preventDefault();
-    const button=$('submitBtn'); button.disabled=true;
-    $('formMessage').className='form-message'; $('formMessage').textContent='Đang lưu…';
+    const button=$('submitBtn');
+    const originalText=button.textContent;
+    button.disabled=true;
+    button.classList.add('is-loading');
+    button.setAttribute('aria-busy','true');
+    button.innerHTML='<span class="btn-spinner"></span><span>Đang lưu…</span>';
+    $('formMessage').className='form-message';
+    $('formMessage').textContent='Đang lưu thông tin…';
     const fd=new FormData(e.currentTarget), data={};
     // Chỉ các ô đang hiển thị mới được phép cập nhật.
     [...new Set([...(currentStudent.formFields||currentStudent.missingFields||[]),'phone'])].forEach(k=>{ if(fd.has(k)) data[k]=String(fd.get(k)||'').trim(); });
@@ -84,11 +94,18 @@
       const out=await postJson({action:'submitStudent',token,data});
       $('formMessage').className='form-message ok';
       $('formMessage').textContent=out.completed?'✓ Đã lưu. Thông tin của bạn đã được hoàn thành.':'✓ Đã lưu thành công.';
-      const refreshed=await getJson({action:'getStudent',id:token,ts:Date.now()}); render(refreshed.student); try{localStorage.setItem(CACHE_KEY,JSON.stringify({t:Date.now(),student:refreshed.student}));}catch(_e){}
+      const refreshed=await getJson({action:'getStudent',id:token,ts:Date.now()});
+      render(refreshed.student); try{localStorage.setItem(CACHE_KEY,JSON.stringify({t:Date.now(),student:refreshed.student}));}catch(_e){}
       $('formMessage').className='form-message ok';
       $('formMessage').textContent=out.completed?'✓ Đã lưu. Thông tin của bạn đã được hoàn thành.':'✓ Đã lưu thành công.';
     }catch(err){
-      $('formMessage').className='form-message error'; $('formMessage').textContent=err.message||'Có lỗi xảy ra.'; button.disabled=false;
+      $('formMessage').className='form-message error';
+      $('formMessage').textContent='Không thể lưu: '+(err.message||'Có lỗi xảy ra.');
+    } finally {
+      button.disabled=false;
+      button.classList.remove('is-loading');
+      button.removeAttribute('aria-busy');
+      button.textContent= currentStudent && currentStudent.completed ? 'CẬP NHẬT THÔNG TIN' : originalText;
     }
   });
 

@@ -1,7 +1,7 @@
 (() => {
   const api=(window.APP_CONFIG||{}).API_URL||'';
   const $=id=>document.getElementById(id);
-  let secret='', dataset=[];
+  let secret='', dataset=[], filtered=[];
   function msg(text,cls=''){ $('msg').textContent=text; $('msg').className=`msg ${cls}`; }
   function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   async function post(payload){
@@ -10,8 +10,11 @@
     const data=await r.json(); return data;
   }
   async function load(){
-    const r=await post({action:'adminList',secret}); if(!r.ok) throw new Error(r.error||'Không thể tải dữ liệu.');
-    dataset=Array.isArray(r.students)?r.students:[]; updateClassFilter_(); render();
+    setBusy_($('refresh'),true,'Đang tải…');
+    try{
+      const r=await post({action:'adminList',secret}); if(!r.ok) throw new Error(r.error||'Không thể tải dữ liệu.');
+      dataset=Array.isArray(r.students)?r.students:[]; updateClassFilter_(); render();
+    } finally { setBusy_($('refresh'),false,'Làm mới'); }
   }
   function updateClassFilter_(){
     const sel=$('classFilter'), cur=sel.value;
@@ -19,6 +22,8 @@
     sel.innerHTML='<option value="">Tất cả lớp</option>'+cls.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
     if(cls.includes(cur)) sel.value=cur;
   }
+  function setBusy_(btn,busy,text){ if(!btn)return; btn.disabled=busy; btn.classList.toggle('busy',busy); btn.innerHTML=busy?'<span class="mini-spinner"></span>'+text:text; }
+  function toast_(text,cls=''){ const el=document.createElement('div'); el.className='toast '+cls; el.textContent=text; document.body.appendChild(el); requestAnimationFrame(()=>el.classList.add('show')); setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),220)},1800); }
   function render(){
     const q=$('search').value.trim().toLowerCase(), c=$('classFilter').value, s=$('statusFilter').value;
     const list=dataset.filter(x=>{
@@ -26,13 +31,14 @@
       return (!q||name.includes(q))&&(!c||x.className===c)&&(!s||(s==='done'?!!x.completed:!x.completed));
     });
     const base=new URL(location.href); base.pathname=base.pathname.replace(/admin\.html$/i,''); base.search=''; base.hash='';
+    filtered=list;
     $('rows').innerHTML=list.map(x=>{
       const subjects=['subject1','subject2','subject3','subject4','subject5','subject6','subject7'].filter(k=>x[k]).map((k,i)=>['Toán','Tiếng Anh','Vật lí','Hóa học','Sinh học','Lịch sử','Địa lý'][Number(k.replace('subject',''))-1]).join(', ');
       const url=`${base.toString()}?id=${encodeURIComponent(x.token)}`;
       return `<tr><td><strong>${esc(x.fullName)}</strong></td><td>${esc(x.className||'')}</td><td>${esc(x.email||'')}</td><td>${esc(x.phone||'')}</td><td>${esc(subjects)}</td><td><span class="pill ${x.completed?'good':'pending'}">${x.completed?'Đã hoàn thành':'Chưa hoàn thành'}</span></td><td><button class="copy" data-url="${esc(url)}">Copy link</button></td></tr>`;
     }).join('') || '<tr><td colspan="7" style="text-align:center;padding:24px">Chưa có học sinh.</td></tr>';
     document.querySelectorAll('button.copy').forEach(b=>b.onclick=async()=>{
-      try{ await navigator.clipboard.writeText(b.dataset.url); b.textContent='Đã copy'; setTimeout(()=>b.textContent='Copy link',1200); }
+      try{ await navigator.clipboard.writeText(b.dataset.url); b.textContent='✓ Đã copy'; b.classList.add('copied'); toast_('Đã sao chép link học sinh.','ok'); setTimeout(()=>{b.textContent='Copy link';b.classList.remove('copied')},1200); }
       catch(e){ prompt('Sao chép link này:',b.dataset.url); }
     });
     const total=dataset.length, done=dataset.filter(x=>!!x.completed).length;
@@ -47,14 +53,37 @@
   }
   $('loginForm').onsubmit=e=>{e.preventDefault();login();};
   $('logout').onclick=()=>location.reload();
-  $('refresh').onclick=()=>load().then(()=>msg('Đã làm mới dữ liệu.','ok')).catch(e=>msg(e.message,'error'));
+  $('refresh').onclick=()=>load().then(()=>{msg('✓ Dữ liệu đã được làm mới.','ok');toast_('Đã cập nhật dữ liệu mới nhất.','ok')}).catch(e=>{msg(e.message,'error');toast_(e.message,'error')});
   ['search','classFilter','statusFilter'].forEach(id=>$(id).addEventListener('input',render));
 
-  $('export').onclick=async()=>{
+  async function downloadBlob_(blob, filename){
+    const url=URL.createObjectURL(blob);
     try{
-      msg('Đang lấy mẫu Excel gốc và dữ liệu mới…');
+      const a=document.createElement('a');
+      a.style.display='none';
+      a.href=url;
+      a.download=filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Một số trình duyệt cần thêm một nhịp để nhận lệnh tải xuống.
+      await new Promise(r=>setTimeout(r,300));
+    }finally{
+      setTimeout(()=>URL.revokeObjectURL(url),1200);
+    }
+  }
+
+  $('export').onclick=async()=>{
+    const btn=$('export');
+    if(btn.disabled) return;
+    try{
+      if(typeof XLSX==='undefined') throw new Error('Thư viện Excel chưa tải xong. Hãy chờ 2–3 giây rồi bấm Xuất Excel lại.');
+      setBusy_(btn,true,'Đang xuất…');
+      msg('Đang lấy dữ liệu mới nhất và tạo file Excel…');
       const r=await post({action:'exportData',secret});
-      if(!r.ok) throw new Error(r.error||'Không thể lấy dữ liệu xuất.');
+      if(!r||!r.ok) throw new Error(r?.error||'Không thể lấy dữ liệu xuất.');
+      if(!r.base64) throw new Error('Backend không trả về file Excel. Hãy thử triển khai lại Web App.');
+
       const bin=atob(r.base64), bytes=new Uint8Array(bin.length);
       for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
       const wb=XLSX.read(bytes,{type:'array',cellDates:true});
@@ -67,22 +96,16 @@
         const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
         const headerIndex=findHeaderRow_(rows);
         if(headerIndex<0) return;
-
         const header=rows[headerIndex]||[];
         const cols=headerMap_(header);
-        const dataRows=[];
         for(let i=headerIndex+1;i<rows.length;i++){
           const row=rows[i]||[];
-          const name=cell_(row,cols.fullName);
-          const cls=cell_(row,cols.className);
+          const name=cell_(row,cols.fullName), cls=cell_(row,cols.className);
           if(!String(name).trim()) continue;
-          dataRows.push({i,row,name,cls});
-        }
-
-        dataRows.forEach(({i,row,name,cls})=>{
           const student=byKey.get(studentKey_({fullName:name,className:cls}));
-          if(!student) return;
+          if(!student) continue;
           ensureRowLength_(row,Math.max(...Object.values(cols).filter(v=>v>=0),14)+1);
+          // Chỉ thay các trường thuộc hệ thống; mọi nội dung/định dạng khác của mẫu được giữ nguyên.
           setCell_(row,cols.fullName,student.fullName);
           setCell_(row,cols.email,student.email);
           setCell_(row,cols.birthDate,student.birthDate);
@@ -91,36 +114,36 @@
           setCell_(row,cols.address,student.address);
           setCell_(row,cols.phone,student.phone);
           setCell_(row,cols.className,student.className);
-          SUBJECT_KEYS.forEach((k,idx)=>setCell_(row,cols[k],student[k]||''));
+          SUBJECT_KEYS.forEach(k=>setCell_(row,cols[k],student[k]||''));
           for(let c=0;c<row.length;c++) setWsCell_(ws,i,c,row[c]);
           updated++;
-        });
-
-        // Cập nhật các dòng tổng, nhưng giữ nguyên toàn bộ định dạng và nội dung khác.
-        const totalRows=rows.length-headerIndex-1;
+        }
         if(sheetIndex===0){
-          setWsCell_(ws,0,0,`Danh sách đăng ký tài khoản học sinh Trường THPT Bắc Yên`);
+          setWsCell_(ws,0,0,'Danh sách đăng ký tài khoản học sinh Trường THPT Bắc Yên');
           setWsCell_(ws,1,0,`Tổng số lớp : ${new Set(students.map(x=>String(x.className||'').trim()).filter(Boolean)).size} lớp.`);
           setWsCell_(ws,2,0,`Tổng số học sinh: ${students.length}`);
         }
       });
 
-      const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+      const out=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
       const blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-      const a=document.createElement('a');
-      a.href=URL.createObjectURL(blob);
-      a.download=(r.filename||'THPT_Bac_Yen.xlsx').replace(/\.xlsx$/i,'')+'_da_cap_nhat.xlsx';
-      a.click();
-      setTimeout(()=>URL.revokeObjectURL(a.href),1500);
-      msg(`Xuất Excel thành công. Đã cập nhật ${updated} học sinh trên mẫu gốc, giữ nguyên các thông tin/Sheet/định dạng khác.`,'ok');
-    }catch(e){msg(e.message||'Có lỗi khi xuất Excel.','error');}
+      const stamp=new Date().toISOString().slice(0,10);
+      const filename=`THPT_Bac_Yen_da_cap_nhat_${stamp}.xlsx`;
+      await downloadBlob_(blob,filename);
+      msg(`✓ Đã tạo file Excel thành công: ${filename} (${updated} dòng được cập nhật).`,'ok');
+      toast_('✓ File Excel đã được tải xuống. Kiểm tra thư mục Tải xuống của trình duyệt.','ok');
+    }catch(e){
+      console.error(e);
+      msg(e.message||'Có lỗi khi xuất Excel.','error');
+      toast_(e.message||'Xuất Excel thất bại.','error');
+    }finally{setBusy_(btn,false,'Xuất Excel');}
   };
-
 
   $('importFile').onchange=async e=>{
     const f=e.target.files[0]; if(!f) return;
     try{
       msg('Đang đọc file Excel và lưu mẫu gốc…');
+      toast_('Đang xử lý file Excel, vui lòng chờ…');
       const arrayBuffer=await f.arrayBuffer();
       const wb=XLSX.read(arrayBuffer,{type:'array',cellDates:true});
       const ws=wb.Sheets[wb.SheetNames[0]];
@@ -135,7 +158,7 @@
       const base64=bytesToBase64_(new Uint8Array(arrayBuffer));
       const out=await post({action:'importStudents',secret,students:payload,templateBase64:base64,templateName:f.name});
       if(!out.ok) throw new Error(out.error||'Không thể nhập dữ liệu.');
-      await load(); msg(`Đã nhập ${out.count} học sinh. Hệ thống đã lưu mẫu Excel gốc để lần xuất sau không mất dữ liệu/định dạng.`,'ok');
+      await load(); msg(`✓ Đã nhập ${out.count} học sinh. Mẫu Excel gốc đã được lưu.`,'ok'); toast_(`Đã nhập ${out.count} học sinh.`,'ok');
     }catch(err){msg(err.message,'error');}
     finally{e.target.value='';}
   };

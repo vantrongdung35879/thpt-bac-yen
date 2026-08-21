@@ -7,8 +7,16 @@
   function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   async function post(payload){
     if(!api||api.includes('YOUR_GOOGLE')) throw new Error('Hệ thống chưa cấu hình API trong config.js.');
-    const r=await fetch(api,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
-    const data=await r.json(); return data;
+    const r=await fetch(api,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow',cache:'no-store'});
+    const text=await r.text();
+    const trimmed=text.trim();
+    if(!trimmed) throw new Error('API không trả về dữ liệu.');
+    try { return JSON.parse(trimmed); }
+    catch(err){
+      const title = /<title[^>]*>(.*?)<\/title>/is.exec(trimmed);
+      const detail = title ? title[1].replace(/<[^>]+>/g,'').trim() : trimmed.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,220);
+      throw new Error('Google Apps Script đang trả về trang HTML thay vì JSON. Hãy kiểm tra URL Web App, quyền “Bất kỳ ai”, và triển khai phiên bản mới. Chi tiết: '+detail);
+    }
   }
   async function load(){
     setBusy_($('refresh'),true,'Đang tải…');
@@ -83,7 +91,7 @@
       msg('Đang lấy dữ liệu mới nhất và tạo file Excel…');
       const r=await post({action:'exportData',secret});
       if(!r||!r.ok) throw new Error(r?.error||'Không thể lấy dữ liệu xuất.');
-      if(!r.base64) throw new Error('Backend không trả về file Excel. Hãy thử triển khai lại Web App.');
+      if(!r.base64) throw new Error('Backend không trả về file Excel mẫu. Dữ liệu học sinh không bị xóa. Hãy kiểm tra file mẫu đã được lưu khi Nhập Excel chưa.');
 
       const bin=atob(r.base64), bytes=new Uint8Array(bin.length);
       for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);

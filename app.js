@@ -3,6 +3,8 @@
   const $ = id => document.getElementById(id);
   const token = new URLSearchParams(location.search).get('id');
   let currentStudent = null;
+  const CACHE_KEY = token ? `thpt_bac_yen_student_${token}` : '';
+  const CACHE_TTL = 60 * 1000;
 
   const labels = {
     fullName:{label:'Họ và tên',type:'text',required:true},
@@ -21,7 +23,7 @@
   async function getJson(params){
     if(!api || api.includes('YOUR_GOOGLE')) throw new Error('Hệ thống chưa cấu hình API.');
     const u=new URL(api); Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));
-    const r=await fetch(u.toString(),{cache:'no-store'}); const data=await r.json();
+    const r=await fetch(u.toString(),{cache:'force-cache'}); const data=await r.json();
     if(!data.ok) throw new Error(data.error||'Có lỗi từ máy chủ.'); return data;
   }
   async function postJson(payload){
@@ -82,7 +84,7 @@
       const out=await postJson({action:'submitStudent',token,data});
       $('formMessage').className='form-message ok';
       $('formMessage').textContent=out.completed?'✓ Đã lưu. Thông tin của bạn đã được hoàn thành.':'✓ Đã lưu thành công.';
-      const refreshed=await getJson({action:'getStudent',id:token}); render(refreshed.student);
+      const refreshed=await getJson({action:'getStudent',id:token,ts:Date.now()}); render(refreshed.student); try{localStorage.setItem(CACHE_KEY,JSON.stringify({t:Date.now(),student:refreshed.student}));}catch(_e){}
       $('formMessage').className='form-message ok';
       $('formMessage').textContent=out.completed?'✓ Đã lưu. Thông tin của bạn đã được hoàn thành.':'✓ Đã lưu thành công.';
     }catch(err){
@@ -92,5 +94,7 @@
 
   const SUBJECT_KEYS=['subject1','subject2','subject3','subject4','subject5','subject6','subject7'];
   if(!token){ showError('Thiếu mã nhận diện học sinh trong đường dẫn.'); return; }
-  getJson({action:'getStudent',id:token}).then(r=>render(r.student)).catch(e=>showError(e.message));
+  const cached = (()=>{try{const x=JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); return x&&Date.now()-x.t<CACHE_TTL?x.student:null;}catch(_e){return null;}})();
+  if(cached) render(cached);
+  getJson({action:'getStudent',id:token,ts:Date.now()}).then(r=>{render(r.student); try{localStorage.setItem(CACHE_KEY,JSON.stringify({t:Date.now(),student:r.student}));}catch(_e){}}).catch(e=>{if(!cached) showError(e.message);});
 })();
